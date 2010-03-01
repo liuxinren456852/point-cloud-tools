@@ -75,21 +75,33 @@ int export_stats(const _TCHAR* pcmmf_filename, const uint64 min_npoints_per_cell
 		const auto& sdetr = stats_detr[ij];
 		uint64 i, j;
 		grid.index_decode(cell.gridij, i, j);
-		const double xloc=grid.pmin.x+grid.res.x*i+grid.res.x/2;
-		const double yloc=grid.pmin.y+grid.res.y*j+grid.res.y/2;
+
+
+		// Bring it back to the original system of coordinates
+		const double xloc = grid.pmin.x+grid.res.x*i+grid.res.x/2   + grid.p0.x;
+		const double yloc = grid.pmin.y+grid.res.y*j+grid.res.y/2   + grid.p0.y;
+		const double3 pcom = s.pcom + grid.p0;
+		const double3 pzmin = s.pzmin + grid.p0;
+		const double3 pzmax = s.pzmax + grid.p0;
 
 		uint64 nunderpopulatedcells = 0;
 
+		// normally = zmean elevation at the center of the cell
+		auto write = [&xloc, &yloc, &pcom, &pzmin, &pzmax, &s, &sdetr, &cell](ofstream &out) {
+			out<<xloc<<","<<yloc<<","<<pcom.z << "," << pzmax.z<<","<<pzmin.z<<","<<pzmax.z-pzmin.z<<","<<s.stdev<<","<< sdetr.stdev<< ","<<s.skew <<","<<sdetr.skew<< "," <<s.kurt << "," <<sdetr.kurt<< "," << sdetr.pcom.z <<","<< cell.npoints<<endl;
+		};
+
 		if(cell.npoints < min_npoints_per_cell) {
 			nunderpopulatedcells++;
-			outstat_underpopulated<<xloc<<","<<yloc<<","<<s.pcom.z << "," << s.pzmax.z<<","<<s.pzmin.z<<","<<s.pzmax.z-s.pzmin.z<<","<<s.stdev<<","<< sdetr.stdev<< ","<<s.skew <<","<<sdetr.skew<< "," <<s.kurt << "," <<sdetr.kurt<< "," << sdetr.pcom.z <<","<< cell.npoints<<endl;
+			write(outstat_underpopulated);
+//			outstat_underpopulated<<xloc<<","<<yloc<<","<<pcom.z << "," << pzmax.z<<","<<pzmin.z<<","<<pzmax.z-pzmin.z<<","<<s.stdev<<","<< sdetr.stdev<< ","<<s.skew <<","<<sdetr.skew<< "," <<s.kurt << "," <<sdetr.kurt<< "," << sdetr.pcom.z <<","<< cell.npoints<<endl;
 			//			cell.stdev = cell.stdev_detrended = cell.skew = cell.kurt = NaN;
 		} else {
+			write(outstat);
 			//	outstat << "x " << "y " << "zmean " << "zmax " << "zmin " << "range " << "stdev " << "stdev_detrended " << "zmean_detrended" << " n"<< endl;
-			outstat<<xloc<<","<<yloc<<","<<s.pcom.z << "," << s.pzmax.z<<","<<s.pzmin.z<<","<<s.pzmax.z-s.pzmin.z<<","<<s.stdev<<","<< sdetr.stdev<< ","<<s.skew <<","<<sdetr.skew<< "," <<s.kurt << "," <<sdetr.kurt<< "," << sdetr.pcom.z <<","<< cell.npoints<<endl;
-			outmax<<s.pzmax << endl;
-			outmin<<s.pzmin << endl;
-			outcentroid<<s.pcom  << endl;
+			outmax<<pzmax << endl;
+			outmin<<pzmin << endl;
+			outcentroid<<pcom  << endl;
 		}
 	}
 	clog << "done in " << time(NULL) - start << "sec\n\n";
