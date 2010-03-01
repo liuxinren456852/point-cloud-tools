@@ -103,6 +103,13 @@ inline xyz operator-(const xyz &left, const xyz &right) {
 	return res;
 }
 
+//template<typename float3, typename double3>
+inline double3 operator+(const float3 &left, const double3 &right)
+{
+	double3 res = {left.x + right.x, left.y + right.y, left.z + right.z};
+	return res;
+}
+
 template<typename xyz>
 inline xyz & operator/=(xyz &lhs, const xyz::elem_type &rhs) {
 	lhs.x /= rhs;
