@@ -42,8 +42,11 @@ enum { X, Y, Z };
 // Types definitions
 //template<int dim, typename t> struct Point;
 template<typename t> struct Point3 {typedef t elem_type; t x,y,z;};
+template<typename t> struct Tuple4 {typedef t elem_type; t x,y,z,w;};
 typedef Point3<float> float3;
 typedef Point3<double> double3;
+typedef Point3<uint32> uint3;
+typedef boost::rational<uint32> rat;
 
 
 static inline istream &operator>>(istream &is, const char* str)
@@ -59,7 +62,16 @@ static inline istream &operator>>(istream &is, const char ch)
 	char ch_actual = is.get();
 	return is;
 }
-
+// template<typename T>
+// static inline ostream& operator <<(ostream &os, const boost::rational<T> &x) {
+// 	os << "Fraction(" << x.numerator() << ", " << x.denominator() << ')';
+// 	return os;
+// }
+// template<typename T>
+// static inline istream& operator>>(istream &is, boost::rational<T> &x) {
+// 	is >> ws >> "Fraction(" >> x.numerator() >> ws >> ',' >> x.denominator() >> ws >> ')';
+// 	return is;
+// }
 template<typename t>
 static inline ostream& operator <<(ostream &os, const Point3<t> &p) {
 	os << '[' << p.x << ", " << p.y << ", " << p.z << ']';
@@ -71,10 +83,23 @@ static inline istream& operator>>(istream &is, Point3<t> &p) {
 	return is;
 }
 
+template<typename t>
+static inline ostream& operator <<(ostream &os, const Tuple4<t> &p) {
+	os << '[' << p.x << ", " << p.y << ", " << p.z << ", " << p.w << ']';
+	return os;
+}
+template<typename t>
+static inline istream& operator>>(istream &is, Tuple4<t> &p) {
+	is >> ws >> '[' >> p.x >> ws >> ',' >> p.y >> ws >>',' >> p.z >> ws >> ',' >> p.w  >> ws >> ']';
+	return is;
+}
+
 
 //Access function use: as_array(somexyzpoint)[2] is the same as somexyzpoint.z 
 template<typename A>
 inline A::elem_type * as_array(A &x) { return (A::elem_type*)&x; }
+template<typename A>
+inline const A::elem_type * as_array(const A &x) { return (const A::elem_type*)&x; }
 
 //Subscript index access
 //template<int coord, typename point_type>
@@ -104,7 +129,7 @@ inline xyz operator-(const xyz &left, const xyz &right) {
 }
 
 //template<typename float3, typename double3>
-inline double3 operator+(const float3 &left, const double3 &right)
+inline double3 operator+(const double3 &left, const double3 &right)
 {
 	double3 res = {left.x + right.x, left.y + right.y, left.z + right.z};
 	return res;
@@ -126,4 +151,89 @@ inline double3 convert(const float3 &p) {
 	double3 p1 = { p.x, p.y, p.z};
 	return p1;
 };
+template<typename T>
+inline void assign(Point3<T> &l, const Wm4::Vector3<T> &r) {
+	l.x = r.X();
+	l.y = r.Y();
+	l.z = r.Z();
+};
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// Kahan summation for an accurate sum of large arrays.
+// http://en.wikipedia.org/wiki/Kahan_summation_algorithm
+#define KAHAN
+#ifdef KAHAN
+template<typename T>
+struct FPKahanAdd {
+	T c;
+	T& sum;
+	FPKahanAdd(T& sum_ref) : sum(sum_ref), c(sum_ref) {}
+	inline void operator()(const T &x) {
+		auto const y = x - c;
+		auto const t = sum + y;
+		c = (t - sum) - y;
+		sum = t;
+	}
+};
+#define FPSUM(sum) FPKahanAdd<decltype(sum)> sum##_add(sum)
+#else
+template<typename T>
+struct FPSimpleAdd {
+	T& sum;
+	FPSimpleAdd(T& sum_ref) : sum(sum_ref) {}
+	inline void operator()(const T &x) {sum += x;}
+};
+#define FPSUM(sum) FPSimpleAdd<decltype(sum)> sum##_add(sum)
+#endif
+
+
+
+//template<typename T>
+//typedef FPSimpleAdd<T> FPAdd<T>
+//#define FPADD(sum, x) (sum##_ks).add((x))
+//#define FPADDINIT(sum) FPKahanAdd<decltype(sum)> sum##_ks(sum)
+//#else
+//#define FPADD(sum, x) (sum)+=(x)
+//#define FPADDINIT(sum0)
+//#endif
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+template<typename T>
+inline Point3<T> convert(const Wm4::Vector3<T> &v) {const Point3<T> u = {v.X(), v.Y(), v.Z()}; return u;};

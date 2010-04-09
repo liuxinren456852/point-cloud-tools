@@ -59,7 +59,7 @@
 
 
 #include <ios>
-#define FUSION_MAX_VECTOR_SIZE 15
+#define FUSION_MAX_VECTOR_SIZE 16
 //#define FUSION_MAX_MAP_SIZE 12
 #include <boost/fusion/include/map.hpp>
 #include <boost/fusion/include/at_key.hpp>
@@ -75,10 +75,23 @@
 #include <boost/format.hpp>
 
 #include <boost/range.hpp>
+#include <boost/rational.hpp>
 
 #include <boost/assert.hpp>
-//#include <Eigen/Core>
 
+//#include <Eigen/Core>
+#include "Wm4NoniterativeEigen3x3.h"
+#include "Wm4Quaternion.h"
+//"except we'll have our own output format"
+static inline std::ostream& operator<< (std::ostream& rkOStr, const Wm4::Vector3d& rkV) {
+	return rkOStr << '[' << rkV.X() << ", " << rkV.Y() << ", " << rkV.Z() << ']';
+}
+static inline std::ostream& operator<< (std::ostream& rkOStr, const Wm4::Quaterniond& rkV) {
+	return rkOStr << '[' << rkV.W() << ", " << rkV.X() << ", " << rkV.Y() << ", " << rkV.Z() << ']';
+}
+static inline std::ostream& operator<< (std::ostream& rkOStr, const Wm4::Matrix3d& A) {
+	return rkOStr << A.GetRow(0) << std::endl << A.GetRow(1) << std::endl << A.GetRow(2);
+}
 //#include "define.h"
 using namespace std;
 

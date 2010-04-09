@@ -67,14 +67,21 @@ int floatnbits; //64 or 32
 double3 pmin, pmax, pcom, p0, res;
 };
 extern "C" PCTOOLS_API int importpts(const _TCHAR* from_ascii, const _TCHAR* save, PCDESCR &descr);
-*/
+
+struct Rational {
+	int num;
+	int den;
+};*/
 extern "C" PCTOOLS_API int importpts(const _TCHAR* from_ascii, const _TCHAR* save);
 
 //extern "C" struct MMFini;
 //extern "C" PCTOOLS_API int readmmfini(const _TCHAR* file, MMFini &ini);
 //extern "C" PCTOOLS_API int writemmfini(const _TCHAR* file, const MMFini &ini);
-extern "C" PCTOOLS_API int sortintoxygrid(const _TCHAR* unsortedpcmmf_filename, double xres, double yres);
-extern "C" PCTOOLS_API int stats(const _TCHAR* pcmmf_filename);
+extern "C" PCTOOLS_API int sortintoxygrid(const _TCHAR* unsortedpcmmf_filename, uint32 xres_nom, uint32 yres_nom, uint32 denominator, double normal[3]);
+//extern "C" PCTOOLS_API int LSPCA(const _TCHAR* pcmmf_filename);
+extern "C" PCTOOLS_API int changegridresolution(const _TCHAR* pcmmf_filename, uint32 xres_nom, uint32 yres_nom, uint32 denom);
+
+//extern "C" PCTOOLS_API int stats(const _TCHAR* pcmmf_filename);
 extern "C" PCTOOLS_API int stats_detrended(const _TCHAR* pcmmf_filename, const double times_zmin, const double times_zmean, const double times_stdev);
 extern "C" PCTOOLS_API int export_stats(const _TCHAR* pcmmf_filename, const uint64 min_npoints_per_cell);
 

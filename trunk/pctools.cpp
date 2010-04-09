@@ -8,18 +8,36 @@
 #ifdef _MANAGED
 #pragma managed(push, off)
 #endif
+/*
+change the font of console from the application:
 
+HWND GetConsoleWindow();
+
+BOOL WINAPI SetCurrentConsoleFontEx(
+									__in  HANDLE hConsoleOutput,
+									__in  BOOL bMaximumWindow,
+									__in  PCONSOLE_FONT_INFOEX lpConsoleCurrentFontEx
+									);
+
+http://msdn.microsoft.com/en-us/library/ms682073(VS.85).aspx
+*/
 BOOL APIENTRY DllMain( HMODULE hModule,
                        DWORD  ul_reason_for_call,
                        LPVOID lpReserved
 					 )
 {
+	//static UINT oldcodepage = GetConsoleOutputCP();
+
 	switch (ul_reason_for_call)
 	{
 	case DLL_PROCESS_ATTACH:
+		//oldcodepage = GetConsoleOutputCP();
+		//SetConsoleOutputCP(65001); // the same as SetConsoleOutputCP(CP_UTF8);
+		
 	case DLL_THREAD_ATTACH:
 	case DLL_THREAD_DETACH:
 	case DLL_PROCESS_DETACH:
+		//SetConsoleOutputCP(oldcodepage);
 		break;
 	}
     return TRUE;
@@ -30,7 +48,7 @@ BOOL APIENTRY DllMain( HMODULE hModule,
 #endif
 
 // This is an example of an exported variable
-PCTOOLS_API int NUM_THREADS=8;
+PCTOOLS_API int NUM_THREADS=0;
 
 // This is an example of an exported function.
 PCTOOLS_API int set_num_threads(int num_threads)

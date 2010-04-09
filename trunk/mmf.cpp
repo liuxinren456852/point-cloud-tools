@@ -1,18 +1,23 @@
 #include "stdafx.h"
 #include "define.h"
 namespace bi = boost::interprocess;
-int init_mmf(bi::file_mapping &fm, bi::mapped_region &mr, const _TCHAR* file, bi::mode_t mode, int64 resize_bytes) {
-	const wstring wfilename(file);
-	if(resize_bytes > 0) // Resize the file
-	{
-		FILE *file = _tfopen(wfilename.c_str(), _T("wbS"));
-		if(file == NULL) {
-			cerr << "Cannot open a mmf file for writing " << endl; return 1;}
-		if(_chsize_s(_fileno(file), resize_bytes) != 0) {//EBADF 
-			cerr << "Can't resize the output file to" << resize_bytes << endl; return 1; }
-		fclose(file);
-	}
+
+int resize(const wstring &filename, int64 resize_bytes)
+{
+	FILE *file = _tfopen(filename.c_str(), _T("abS"));
+	if(file == NULL) {
+		wcerr << "Cannot open " << filename <<"for writing\n"; return 1;}
+	if(_chsize_s(_fileno(file), resize_bytes) != 0) {//EBADF 
+		wcerr << "Cannot resize " << filename << " file to " << resize_bytes << " bytes\n"; return 1; }
+	fclose(file);
+	return 0;
+}
+
+int init_mmf(bi::file_mapping &fm, bi::mapped_region &mr, const wstring &wfilename, bi::mode_t mode, int64 resize_bytes) {
+	if(resize_bytes > 0 && resize(wfilename, resize_bytes))
+		return 1;
 	// Current limitation of boost::interprocess, no wchar strings
+	// std::codecvt
 	const string filename(wfilename.begin(), wfilename.end());
 	try {
 		bi::file_mapping fm1(filename.c_str(),	mode);

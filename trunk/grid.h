@@ -1,5 +1,6 @@
 #pragma once
 
+
 struct Cell {
 	uint64 gridij;
 	uint64 npoints;
@@ -9,65 +10,60 @@ struct Stats {
 	float3 pcom, pzmin, pzmax;
 	float stdev, skew, kurt;
 };
-Cell const g_init_cell = {0, 0, 0};
-Stats const g_init_stats = {
-	{0.F, 0.F, 0.F}, {0.F, 0.F, FLT_MAX}, {0.F, 0.F, -FLT_MAX},
-	0.F, 0.F, 0.F
-};
+// Cell const g_init_cell = {0, 0, 0};
+// Stats const g_init_stats = {
+// 	{0.F, 0.F, 0.F}, {0.F, 0.F, FLT_MAX}, {0.F, 0.F, -FLT_MAX},
+// 	0.F, 0.F, 0.F
+// };
 
-class XRowMajor {
-protected:
-	void init(const Point3<uint64> &dim) {
-		BOOST_ASSERT(dim.z == 1); // no 3D
-		memnx = dim.x;
-		memny = dim.y;
-		memsize = memnx*memny;
-	}
+
+class Grid {
 public:
-	uint64 memnx, memny; // the actual grids in memory, == dim of the bounding box
-	uint64 memsize; // this is the actual number of cells in memory, == nx*ny
-	uint64 index_encode (uint64 i, uint64 j) const { return i * memny + j;}
-	const uint64 & nx () const { return memnx;}
-	const uint64 & ny () const { return memny;}
-	void index_decode (uint64 ij, uint64 &i, uint64 &j) const { i = ij/memny; j = ij - i*memny;}
-};
-template<typename MemoryLayout>
-class GridT : public MemoryLayout {
-	double find_i(double x) const { return (x - pmin.x) / res.x; }
-	double find_j(double y) const { return (y - pmin.y) / res.y; }
-public:
-	uint64 size, npoints, ncellpts_max, ndatacells;
+	const uint64 & nx () const { return dim.x;}
+	const uint64 & ny () const { return dim.y;}
+	const uint64 size () const { return dim.x*dim.y;}
+	void index_decode (const uint64 ij, uint64 &i, uint64 &j) const { i = ij/ny(); j = ij - i*ny();}
+	uint64 index_encode (uint64 i, uint64 j) const { return i * ny() + j;}
+
+	uint64 npoints, ncellpts_max, ndatacells;
 	Point3<uint64> dim; // index dimensions from the bounding box
-	double3 pmin, pmax, pcom, p0, res;
+	double3 pmin, pmax, pcom, p0;
+	Tuple4<uint32> res;
+	uint8 floatnbits;
 
 	#define LOAD(x) x = bf::at_key<mmfini::x>(ini)
-	GridT(const mmfini::pc &ini, double xres0, double yres0) { 
+	Grid(const mmfini::pc &ini, uint32 xres_nom, uint32 yres_nom, uint32 denom) { 
+		LOAD(npoints);
+		LOAD(floatnbits);
 		LOAD(pmin);
 		LOAD(pmax);
 		LOAD(pcom);
 		LOAD(p0);
+		ncellpts_max = 0;
+		ndatacells = 0;
 
-		p0 += pcom;
-		pmin -= pcom;
-		pmax -= pcom;
-		pcom -= pcom;
+		//p0 += pcom;
+		//pmin -= pcom;
+		//pmax -= pcom;
+		//pcom -= pcom;
 
-		res.x = xres0;
-		res.y = yres0;
+		res.x = xres_nom;
+		res.y = yres_nom;
 		res.z = 0;
+		res.w = denom;
 
-		dim.x = (uint64)((pmax.x-pmin.x)/res.x) + 1;
-		dim.y = (uint64)((pmax.y-pmin.y)/res.y) + 1;
+		dim.x = find_i(pmax.x) + 1;
+		dim.y = find_j(pmax.y) + 1;
 		dim.z = 1;
 
-		size = dim.x * dim.y * dim.z;
-		MemoryLayout::init(dim);
+		//MemoryLayout::init(dim);
 		//nx = (uint64)((pmax.x-pmin.x)/res.x) + 1;
 		//ny = (uint64)((pmax.y-pmin.y)/res.y) + 1;
 		//ncells = nx*ny;
 	}
-	GridT(const mmfini::pcsorted &ini) {
+	Grid(const mmfini::pcsorted &ini) {
 		LOAD(npoints);
+		LOAD(floatnbits);
 		LOAD(pmin);
 		LOAD(pmax);
 		LOAD(pcom);
@@ -77,11 +73,11 @@ public:
 		//LOAD(ncells);
 		LOAD(ncellpts_max);
 
-		dim.x = (uint64)((pmax.x-pmin.x)/res.x) + 1;
-		dim.y = (uint64)((pmax.y-pmin.y)/res.y) + 1;
+		dim.x = find_i(pmax.x) + 1;
+		dim.y = find_j(pmax.y) + 1;
 		dim.z = 1;
-		size = dim.x * dim.y * dim.z;
-		MemoryLayout::init(dim);
+
+		//MemoryLayout::init(dim);
 		const auto& dim0 = bf::at_key<mmfini::dim>(ini);
 		//const auto& ncells = bf::at_key<mmfini::ncells>(ini);
 		BOOST_ASSERT(dim.x == dim0.x && dim.y == dim0.y && dim.z == dim0.z);
@@ -89,10 +85,26 @@ public:
 	}
 	#undef LOAD
 
-	uint64 find_cell(double x, double y) const { return MemoryLayout::index_encode(uint64(find_i(x)), uint64(find_j(y)));}
+	void translate(const double3 &p) {
+		p0 += p;
+		pmin -= p;
+		pmax -= p;
+		pcom -= p;
+	}
+	void change_limits(const double3 &pmin_new, const double3 &pmax_new) {
+		pmin = pmin_new;
+		pmax = pmax_new;
+		dim.x = find_i(pmax.x) + 1;
+		dim.y = find_j(pmax.y) + 1;
+		dim.z = 1;
+	}
+	uint64 find_i(double x) const { return res.w*(x - pmin.x) / res.x; }
+	uint64 find_j(double y) const { return res.w*(y - pmin.y) / res.y; }
+//	uint64 find_cell(double x, double y) const { return MemoryLayout::index_encode(find_i(x), find_j(y));}
+	template<typename T>
+	uint64 find_cell(const Point3<T> &p) const { return index_encode(find_i(p.x), find_j(p.y));}
 
 //idx = find(S==1);
 //[ii,jj,kk] = ind2sub(size(S),idx) 
 };
 
-typedef GridT<XRowMajor> Grid;
