@@ -14,7 +14,7 @@ namespace mmfini
 	FIELD(ncells, uint64);
 	FIELD(ndatacells, uint64);
 	FIELD(ncellpts_max, uint64);
-	FIELD(res, double3);
+	FIELD(res, Tuple4<uint32>);
 // 	FIELD(yres, float64);
 // 	FIELD(xmean, float64);
 // 	FIELD(ymean, float64);
@@ -26,6 +26,11 @@ namespace mmfini
 	FIELD(pmax, double3);
 	FIELD(pcom, double3);
 	FIELD(p0, double3);
+	FIELD(eigen_values, double3);
+	FIELD(eigen_vec0, double3);
+	FIELD(eigen_vec1, double3);
+	FIELD(eigen_vec2, double3);
+	FIELD(grid_plane_normal, double3);
 	FIELD(dim, Point3<uint64>);
 //	FIELD(ny, uint64);
 //	FIELD(nz, uint64);
@@ -46,7 +51,11 @@ namespace mmfini
 		pmin::pair,
 		pmax::pair,
 		pcom::pair,
-		p0::pair
+		p0::pair,
+		eigen_values::pair,
+		eigen_vec0::pair,
+		eigen_vec1::pair,
+		eigen_vec2::pair
 	> pc;
 	typedef bf::map	<
 		npoints::pair,
@@ -55,6 +64,11 @@ namespace mmfini
 		pmax::pair,
 		pcom::pair,
 		p0::pair,
+		eigen_values::pair,
+		eigen_vec0::pair,
+		eigen_vec1::pair,
+		eigen_vec2::pair,
+		grid_plane_normal::pair,
 		res::pair,
 		dim::pair,
 		ncells::pair,

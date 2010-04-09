@@ -4,7 +4,7 @@
 #include "mmf.h"
 #include "mmfini.h"
 #include "grid.h"
-void calculate_cell_stats(const float3 points[], const uint64 n, Stats &stats);
+extern void calculate_cell_stats(const float3 points[], const uint64 n, Stats &stats);
 
 int stats_detrended(const _TCHAR* pcmmf_filename, const double times_zmin, const double times_zmean, const double times_stdev)
 {
@@ -23,9 +23,13 @@ int stats_detrended(const _TCHAR* pcmmf_filename, const double times_zmin, const
 
 	// File names
 	const wstring filename_ext(pcmmf_filename);
+	wstring filename(filename_ext), ext;
 	const wstring::size_type beginext = filename_ext.rfind('.');
-	const wstring filename(filename_ext, 0, beginext);
-	const wstring ext(filename_ext, beginext);
+	if(beginext!=wstring::npos) {
+		filename.assign(filename_ext, 0, beginext);
+		ext.assign(filename_ext, beginext, wstring::npos);
+	}
+
 	// Open description file
 	mmfini::pcsorted ini;
 	if(!mmfini::load(ini, mmfini::filename(filename).c_str())) {
@@ -35,41 +39,40 @@ int stats_detrended(const _TCHAR* pcmmf_filename, const double times_zmin, const
 	// Initialize the grid
 	Grid grid(ini);
 	// Validate parameters
-	BOOST_ASSERT(bf::at_key<mmfini::floatnbits>(ini) == sizeof(float)*8);
+	if(grid.floatnbits != 32) {
+		clog << "The mmf appears to be unsorted (floatnbits != 32)";
+		return 1;
+	}
 	// Open mmf files
-	MMF<float3> points;
-	MMF<Cell> cells;
-	MMF<Stats> stats;
-	MMF<Stats> stats_detr;
-	MMF<uint64>	cellindex1;
-	if(	stats.open(filename + _T("_stats") + ext)
-		|| points.open(filename_ext)
-		|| cells.open(filename + _T("_cells") + ext)
-		|| stats_detr.open(filename + _T("_stats_detr") + ext, bi::read_write, grid.ndatacells)
-		|| cellindex1.open(filename + _T("_cellindex1") + ext)
+	MMF<float3> points(filename_ext);
+	MMF<Cell> cells(filename + _T("_cells") + ext);
+	MMF<Stats> stats(filename + _T("_stats") + ext);
+	MMF<Stats> stats_detr(filename + _T("_stats_detr") + ext);
+	MMF<uint64>	cellindex1(filename + _T("_cellindex1") + ext);
+	if(	stats.open()
+		|| points.open()
+		|| cells.open()
+		|| stats_detr.open(bi::read_write, grid.ndatacells)
+		|| cellindex1.open()
 		)
 		return 1;
 	// Validate sizes
 	BOOST_ASSERT(grid.ndatacells == cells.size());
 	BOOST_ASSERT(grid.ndatacells == stats.size());
 	BOOST_ASSERT(grid.ndatacells == stats_detr.size());
-	BOOST_ASSERT(grid.memsize == cellindex1.size());
+	BOOST_ASSERT(grid.size() == cellindex1.size());
 	clog << "\ncollecting 'detrended' statistics in data cells\n";
 	clog << "using ";
-	omp_set_num_threads(NUM_THREADS);
+	if(NUM_THREADS)
+		omp_set_num_threads(NUM_THREADS);
 
 #pragma omp parallel
 {
-	#pragma omp master
-	{
-		clog << omp_get_num_threads() << " threads\n";
- 	}
-
 	// We will need a per-thread buffer for detrended points in each cell
 	vector<float3> points_inthiscell_detrended;
 	points_inthiscell_detrended.reserve(grid.ncellpts_max);
 
-	#pragma omp for
+	#pragma omp for schedule(dynamic, 1) nowait
 	for(auto ij = 0; ij < cells.size(); ij++) {
 		const auto& cell = cells[ij];
 		const auto& cellstats = stats[ij];
@@ -79,9 +82,9 @@ int stats_detrended(const _TCHAR* pcmmf_filename, const double times_zmin, const
 		const double xloc=grid.pmin.x+grid.res.x*i+grid.res.x/2;
 		const double yloc=grid.pmin.y+grid.res.y*j+grid.res.y/2;
 		auto const
-			iplus1 = min<uint64>(i + 1, grid.memnx-1),
+			iplus1 = min<uint64>(i + 1, grid.nx()-1),
 			iminus1 = max<uint64>(i, 1) - 1,
-			jplus1 = min<uint64>(j + 1, grid.memny-1),
+			jplus1 = min<uint64>(j + 1, grid.ny()-1),
 			jminus1 = max<uint64>(j, 1) - 1;
 
 
@@ -115,6 +118,11 @@ int stats_detrended(const _TCHAR* pcmmf_filename, const double times_zmin, const
 		cellstats_detr.pcom = convert(pcom);
 		calculate_cell_stats(&points_inthiscell_detrended[0], n, cellstats_detr);
 		points_inthiscell_detrended.clear();
+	}
+
+#pragma omp master
+	{
+		clog << omp_get_num_threads() << " threads\n";
 	}
 } // #pragma omp parallel
 	clog << "stats_detrended() completed in " << time(NULL) - start << "sec\n";

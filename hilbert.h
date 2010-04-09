@@ -1,5 +1,6 @@
 #pragma once
-//#define HILBERT
+#define HILBERT
+#ifdef HILBERT
 inline uint64 i64log2(register uint64 x)
 {
 	register uint64 l=0UL;
@@ -106,10 +107,9 @@ inline void decode_hilbert(const uint64 n, register uint64 code, uint64 &xout, u
 class Hilbert2DSpaceFillingCurve {
 	const uint8 resolution;
 public:
-	Hilbert2DSpaceFillingCurve(uint64 nx, uint64 ny) :
-	  resolution(i64log2(max(nx,ny)) + 1)
-	{	}
+	Hilbert2DSpaceFillingCurve(uint64 nx, uint64 ny) : resolution(i64log2(max(nx,ny)) + 1) {}
 	const uint64 length() const {return 1ull << (resolution << 1);}
-	uint64 encode(uint64 x, uint64 y) {return encode_hilbert(resolution, x, y);}
-	void decode(uint64 h, uint64 &xout, uint64 &yout) {decode_hilbert(resolution, h,xout,yout);}
+	const uint64 encode(uint64 x, uint64 y) const {return encode_hilbert(resolution, x, y);}
+	void decode(uint64 h, uint64 &xout, uint64 &yout) const {decode_hilbert(resolution, h,xout,yout);}
 };
+#endif

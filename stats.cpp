@@ -4,8 +4,10 @@
 #include "mmf.h"
 #include "mmfini.h"
 #include "grid.h"
-inline void calculate_cell_stats(const float3 points[], const uint64 n, Stats &stats) {
+extern void calculate_cell_stats(const float3 points[], const uint64 n, Stats &stats) {
 	double stdev = 0., skew = 0., kurt = 0.;
+	stats.pzmax.z = -FLT_MAX;
+	stats.pzmin.z = FLT_MAX;
 	for(auto k = 0; k < n; k++) {
 		auto p = points[k];
 		const double dz = p.z - stats.pcom.z;
@@ -40,9 +42,13 @@ int stats(const _TCHAR* pcmmf_filename)
 
 	// File names
 	const wstring filename_ext(pcmmf_filename);
+	wstring filename(filename_ext), ext;
 	const wstring::size_type beginext = filename_ext.rfind('.');
-	const wstring filename(filename_ext, 0, beginext);
-	const wstring ext(filename_ext, beginext);
+	if(beginext!=wstring::npos) {
+		filename.assign(filename_ext, 0, beginext);
+		ext.assign(filename_ext, beginext, wstring::npos);
+	}
+
 	// Open description file
 	mmfini::pcsorted ini;
 	if(!mmfini::load(ini, mmfini::filename(filename).c_str())) {
@@ -52,14 +58,17 @@ int stats(const _TCHAR* pcmmf_filename)
 	// Initialize the grid
 	Grid grid(ini);
 	// Validate parameters
-	BOOST_ASSERT(bf::at_key<mmfini::floatnbits>(ini) == sizeof(float)*8);
+	if(grid.floatnbits != 32) {
+		clog << "The mmf appears to be unsorted (floatnbits != 32)\n";
+		return 1;
+	}
 	// Open mmf files
-	MMF<float3> points;
-	MMF<Cell> cells;
-	MMF<Stats> stats;
-	if(	stats.open(filename + _T("_stats") + ext, bi::read_write)
-		|| points.open(filename_ext)
-		|| cells.open(filename + _T("_cells") + ext)
+	MMF<float3> points(filename_ext);
+	MMF<Cell> cells(filename + _T("_cells") + ext);
+	MMF<Stats> stats(filename + _T("_stats") + ext);
+	if(	stats.open(bi::read_write)
+		|| points.open()
+		|| cells.open()
 		)
 		return 1;
 	// Validate sizes
@@ -68,7 +77,8 @@ int stats(const _TCHAR* pcmmf_filename)
 	clog << "\ncollecting statistics in data cells\n";
 	clog << "assuming valid pcom data in the _stats file\n";
 	clog << "using ";
-	omp_set_num_threads(NUM_THREADS);
+	if(NUM_THREADS)
+		omp_set_num_threads(NUM_THREADS);
 
 #pragma omp parallel
 {
@@ -76,13 +86,15 @@ int stats(const _TCHAR* pcmmf_filename)
 	{
 		clog << omp_get_num_threads() << " threads\n";
 	}
-	#pragma omp for
+	#pragma omp for schedule(dynamic, 1)
 	for(auto ij = 0; ij < cells.size(); ij++) {
 		const auto& cell = cells[ij];
 		const float3 *const points_inthiscell = points.begin() + cell.startpt;
 		calculate_cell_stats(points_inthiscell, cell.npoints, stats[ij]);
+//		if(ij%1000 == 0)
+//			clog << "\n" << ij << "    " << cell.startpt << "                ";
 	}
 } // #pragma omp parallel
-	clog << "stats() completed in " << time(NULL) - start << "sec\n";
+	clog << "\r" << cells.size() << " cells\nstats() completed in " << time(NULL) - start << "sec\n";
 	return err;
 }

@@ -31,12 +31,12 @@ int export_stats(const _TCHAR* pcmmf_filename, const uint64 min_npoints_per_cell
 	// Validate parameters
 	BOOST_ASSERT(bf::at_key<mmfini::floatnbits>(ini) == sizeof(float)*8);
 	// Open mmf files
-	MMF<Cell> cells;
-	MMF<Stats> stats;
-	MMF<Stats> stats_detr;
-	if(	stats.open(filename + _T("_stats") + ext)
-		|| cells.open(filename + _T("_cells") + ext)
-		|| stats_detr.open(filename + _T("_stats_detr") + ext)
+	MMF<Cell> cells(filename + _T("_cells") + ext);
+	MMF<Stats> stats(filename + _T("_stats") + ext);
+	MMF<Stats> stats_detr(filename + _T("_stats_detr") + ext);
+	if(	stats.open()
+		|| cells.open()
+		|| stats_detr.open()
 		)
 		return 1;
 	// Validate sizes
@@ -69,6 +69,9 @@ int export_stats(const _TCHAR* pcmmf_filename, const uint64 min_npoints_per_cell
 	outmax << "x,y,zmax" << endl;
 	outcentroid << "x,y,zmean" << endl;
 
+	uint64 nunderpopulatedcells = 0;
+	uint64 populatedcells = 0;
+
 	for(auto ij = 0; ij < cells.size(); ij++) {
 		const auto& cell = cells[ij];
 		const auto& s = stats[ij];
@@ -78,13 +81,12 @@ int export_stats(const _TCHAR* pcmmf_filename, const uint64 min_npoints_per_cell
 
 
 		// Bring it back to the original system of coordinates
-		const double xloc = grid.pmin.x+grid.res.x*i+grid.res.x/2   + grid.p0.x;
-		const double yloc = grid.pmin.y+grid.res.y*j+grid.res.y/2   + grid.p0.y;
-		const double3 pcom = s.pcom + grid.p0;
-		const double3 pzmin = s.pzmin + grid.p0;
-		const double3 pzmax = s.pzmax + grid.p0;
+		const double3 pcom = convert(s.pcom) + grid.p0;
+		const double xloc = grid.pmin.x+grid.res.x*i+grid.res.x/2   + pcom.x;
+		const double yloc = grid.pmin.y+grid.res.y*j+grid.res.y/2   + pcom.y;
+		const double3 pzmin = convert(s.pzmin) + pcom;
+		const double3 pzmax = convert(s.pzmax) + pcom;
 
-		uint64 nunderpopulatedcells = 0;
 
 		// normally = zmean elevation at the center of the cell
 		auto write = [&xloc, &yloc, &pcom, &pzmin, &pzmax, &s, &sdetr, &cell](ofstream &out) {
@@ -97,6 +99,7 @@ int export_stats(const _TCHAR* pcmmf_filename, const uint64 min_npoints_per_cell
 //			outstat_underpopulated<<xloc<<","<<yloc<<","<<pcom.z << "," << pzmax.z<<","<<pzmin.z<<","<<pzmax.z-pzmin.z<<","<<s.stdev<<","<< sdetr.stdev<< ","<<s.skew <<","<<sdetr.skew<< "," <<s.kurt << "," <<sdetr.kurt<< "," << sdetr.pcom.z <<","<< cell.npoints<<endl;
 			//			cell.stdev = cell.stdev_detrended = cell.skew = cell.kurt = NaN;
 		} else {
+			populatedcells++;
 			write(outstat);
 			//	outstat << "x " << "y " << "zmean " << "zmax " << "zmin " << "range " << "stdev " << "stdev_detrended " << "zmean_detrended" << " n"<< endl;
 			outmax<<pzmax << endl;
@@ -104,6 +107,7 @@ int export_stats(const _TCHAR* pcmmf_filename, const uint64 min_npoints_per_cell
 			outcentroid<<pcom  << endl;
 		}
 	}
-	clog << "done in " << time(NULL) - start << "sec\n\n";
+	clog << "done in " << time(NULL) - start << "sec\n";
+	clog << populatedcells << " populated cells, " << nunderpopulatedcells << " underpopulated cells\n\n";
 	return err;
 }
